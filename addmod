@@ -1,0 +1,62 @@
+#!/bin/bash
+
+version="addmod 1.0
+Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+This is free software.  You may redistribute copies of it under
+the GNU General Public License <https://www.gnu.org/licenses/gpl.html>
+Made by Axel (AKA AxelDevInMy)"
+
+if [[ $EUID -ne 0 ]]; then
+   echo "You must run application as sudo or root"
+   exit 1
+else
+   for arg; do
+      case "$arg" in
+      --version)   echo "$version" || exit 1; exit;;
+      -*)     option="$arg";;
+      esac
+   done
+
+   if [ ! -z "$option" ] && [ ! -z "$2" ]; then
+      if [ "$option" == "-r" ]; then
+         if [[ -f "/usr/bin/$2" ]]; then
+            if ["$(stat --format '%U' "$1")" = "$whoami"]; then
+               sudo rm /usr/bin/$2
+               echo "Module $2 removed"
+               exit 0
+            else
+               echo "You are not owner of $2 module"
+               exit 1
+            fi
+         else
+            echo "Module $2 not found"
+            exit 1
+         fi
+      elif [ "$option" == "-u" ] && [ ! -z "$3"]; then
+         if [[ -f "/usr/bin/$2" ]]; then
+            if ["$(stat --format '%U' "$1")" = "$whoami"]; then
+               sudo cp "$3" "/usr/bin/$2"
+               sudo chmod 755 "/usr/bin/$2"
+               echo "Module $2 updated"
+               exit 0
+            else
+               echo "You are not owner of $2 module"
+               exit 1
+            fi
+         else
+            echo "Module $2 not found"
+            exit 0
+         fi
+     fi
+   elif [ ! -z "$1" ] && [ ! -z "$2" ]; then
+      if [[ -f "/usr/bin/$2" ]]; then
+         echo "This module already exist, remove it or use another name"
+         exit 1
+      else
+         sudo cp "$1" "/usr/bin/$2"
+         sudo chmod 755 "/usr/bin/$2"
+         echo "Module $2 added"
+         exit 0
+      fi
+   fi
+fi
