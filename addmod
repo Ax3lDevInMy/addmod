@@ -1,10 +1,18 @@
 #!/bin/bash
 
-version="addmod 1.0
+version="addmod 1.1
 Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
 This is free software.  You may redistribute copies of it under
 the GNU General Public License <https://www.gnu.org/licenses/gpl.html>
 Made by Axel (AKA AxelDevInMy)"
+
+usage="Usage $0
+Options:
+   -r      remove global module in /usr/lib/modules and exit
+   -u      update global module and exit
+   -p      create module only for $whoami
+   —version       output version and exit
+   —help          display this help and exit"
 
 if [[ $EUID -ne 0 ]]; then
    echo "You must run application as sudo or root"
@@ -13,15 +21,16 @@ else
    for arg; do
       case "$arg" in
       --version)   echo "$version" || exit 1; exit;;
+      --help)   echo "$usage" || exit 1; exit;;
       -*)     option="$arg";;
       esac
    done
 
    if [ ! -z "$option" ] && [ ! -z "$2" ]; then
       if [ "$option" == "-r" ]; then
-         if [[ -f "/usr/bin/$2" ]]; then
-            if ["$(stat --format '%U' "$1")" = "$whoami"]; then
-               sudo rm /usr/bin/$2
+         if [[ -f "/usr/lib/modules/$2" ]]; then
+            if ["$(stat --format '%U' "$2")" = "$(whoami)"]; then
+               sudo rm /usr/lib/modules/$2
                echo "Module $2 removed"
                exit 0
             else
@@ -33,30 +42,48 @@ else
             exit 1
          fi
       elif [ "$option" == "-u" ] && [ ! -z "$3"]; then
-         if [[ -f "/usr/bin/$2" ]]; then
-            if ["$(stat --format '%U' "$1")" = "$whoami"]; then
-               sudo cp "$3" "/usr/bin/$2"
-               sudo chmod 755 "/usr/bin/$2"
-               echo "Module $2 updated"
-               exit 0
+         if [[ -f "$3" ]]; then
+            if [[ -f "/usr/lib/modules/$2" ]]; then
+               if ["$(stat --format '%U' "$2")" = "$(whoami)"]; then
+                  sudo cp "$3" "/usr/lib/modules/$2"
+                  sudo chmod 755 "/usr/lib/modules/$2"
+                  echo "Module $2 updated"
+                  exit 0
+               else
+                  echo "You are not owner of $2 module"
+                  exit 1
+               fi
             else
-               echo "You are not owner of $2 module"
+               echo "Module $2 not found"
                exit 1
             fi
+         fi
+      elif [ "$option" == "-p" ] && [ ! -z "$3" ]; then
+         if [[ -f "/usr/lib/modules/$3" ]] || [[ -f "~/.local/lib/modules/$3" ]]; then
+            echo "Module $3 already exist"
+            exit 1
          else
-            echo "Module $2 not found"
+            if ! grep -Fxq 'export PATH="$PATH:~/.local/lib/modules/"'  ~/.bashrc; then
+                echo 'export PATH="$PATH:~/.local/lib/modules/"' >> ~/.bashrc
+            fi
+            sudo cp "$2" "~/.local/lib/modules/$3" || mkdir -p $_ && sudo cp "$2" "~/.local/lib/modules/$3"
+            sudo chmod 755 "~/.local/lib/modules/$3"
+            echo "Module $3 added and can be used only by you"
             exit 0
          fi
-     fi
-   elif [ ! -z "$1" ] && [ ! -z "$2" ]; then
-      if [[ -f "/usr/bin/$2" ]]; then
-         echo "This module already exist, remove it or use another name"
-         exit 1
-      else
-         sudo cp "$1" "/usr/bin/$2"
-         sudo chmod 755 "/usr/bin/$2"
-         echo "Module $2 added"
-         exit 0
       fi
+   fi
+elif [ ! -z "$1" ] && [ ! -z "$2" ]; then
+   if [[ -f "/usr/lib/modules/$2" ]] || [[ -f "~/.local/lib/modules/$2" ]]; then
+      echo "Module $2 already exist"
+      exit 1
+   else
+      if ! grep -Fxq 'export PATH="$PATH:/usr/lib/modules/"' /etc/profile; then
+         echo 'export PATH="$PATH:/usr/lib/modules/"' >> /etc/profile
+      fi
+      sudo cp "$1" "/usr/lib/modules/$2" || mkdir -p $_ && sudo cp "$1" "/usr/lib/modules/$2"
+      sudo chmod 755 "/usr/lib/modules/$2"
+      echo "Module $2 added and can be used by any user"
+      exit 0
    fi
 fi
